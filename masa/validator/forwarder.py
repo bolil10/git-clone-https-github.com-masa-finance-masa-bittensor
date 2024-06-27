@@ -19,7 +19,7 @@
 
 from masa.utils.uids import get_random_uids
 from masa.miner.masa_protocol_request import REQUEST_TIMEOUT_IN_SECONDS  # Import the constant
-
+import bittensor as bt
 # this forwarder needs to able to handle multiple requests, driven off of an API request
 class Forwarder:
     def __init__(self, validator):
@@ -31,17 +31,22 @@ class Forwarder:
         ### like blacklisting miners only on a specific endpoint like profiles or followers
         miner_uids = get_random_uids(self.validator, k=self.validator.config.neuron.sample_size)
         
-        responses = await self.validator.dendrite(
+        synapses = await self.validator.dendrite(
             axons=[self.validator.metagraph.axons[uid] for uid in miner_uids],
             synapse=request,
-            deserialize=True,
+            deserialize=False,
             timeout=timeout
         )
+
+        responses = [synapse.response for synapse in synapses]
+        process_times = [synapse.dendrite.process_time for synapse in synapses]
+        bt.logging.info(f"PROCESS TIMES: {process_times}")
 
         # Filter and parse valid responses
         valid_responses, valid_miner_uids = self.sanitize_responses_and_uids(responses, miner_uids=miner_uids)
         parsed_responses = responses
         
+
         if parser_object:
             parsed_responses = [parser_object(**response) for response in valid_responses]
         elif parser_method:
