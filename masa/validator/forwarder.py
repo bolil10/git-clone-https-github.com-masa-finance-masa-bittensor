@@ -18,6 +18,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 from masa.utils.uids import get_random_uids
+import bittensor as bt
 
 
 # this forwarder needs to able to handle multiple requests, driven off of an API request
@@ -26,7 +27,7 @@ class Forwarder:
         self.validator = validator
 
     async def forward(
-        self, request, get_rewards, parser_object=None, parser_method=None, timeout=2
+        self, request, get_rewards, parser_object=None, parser_method=None, timeout=5
     ):
         # TODO: This should live inside each endpoint to enable us to filter miners by different parameters in the future
         # like blacklisting miners only on a specific endpoint like profiles or followers
@@ -71,8 +72,19 @@ class Forwarder:
                     self.validator.set_weights()
                 except Exception as e:
                     bt.logging.error(f"Failed to set weights: {e}")
+                    
+        # Add corresponding uid to each response
+        response_with_uids = [
+            {"response": response, "uid": int(uid.item()), "score": score.item()}
+            for response, uid, score in zip(parsed_responses, valid_miner_uids, rewards)
+        ]
             
-        return parsed_responses
+        response_with_uids.sort(key=lambda x: x["score"], reverse=True)
+        
+        print("FINAL RESPONSES ------------------------------------------------")
+        print(response_with_uids)
+        
+        return response_with_uids
 
     def sanitize_responses_and_uids(self, responses, miner_uids):
         valid_responses = [response for response in responses if response is not None]
